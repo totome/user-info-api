@@ -22,7 +22,6 @@ public class UserApi {
     private static final String LOGIN = "userLogin";
     private static final String LOGIN_CAPTOR = "{"+LOGIN+"}";
     private static final int OK = Response.Status.OK.getStatusCode();
-    private final Logger logger = LoggerFactory.getLogger(UserApi.class);
     private final WebTarget target;
     private final UserDataFactory dataFactory;
 

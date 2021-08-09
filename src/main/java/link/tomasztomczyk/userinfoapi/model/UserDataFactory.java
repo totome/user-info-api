@@ -1,5 +1,7 @@
 package link.tomasztomczyk.userinfoapi.model;
 
+import link.tomasztomczyk.userinfoapi.persistence.LoginRequestsCounter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -7,6 +9,13 @@ import java.math.MathContext;
 
 @Component
 public class UserDataFactory {
+    private final LoginRequestsCounter counter;
+
+    @Autowired
+    public UserDataFactory(LoginRequestsCounter counter) {
+        this.counter = counter;
+    }
+
     public OutputUserData create(InputUserData input) throws UserDataInvalidException {
         if (input == null) {
             throw new IllegalArgumentException("Given user data can not be null");
@@ -15,6 +24,8 @@ public class UserDataFactory {
         if (input.getId() == null || input.getLogin() == null || input.getLogin().isBlank()) {
             throw new UserDataInvalidException("Invalid user data");
         }
+
+        counter.inc(input.getLogin());
 
         return OutputUserData.builder()
                 .id(Long.toString(input.getId()))

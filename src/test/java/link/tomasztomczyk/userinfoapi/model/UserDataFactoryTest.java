@@ -1,11 +1,16 @@
 package link.tomasztomczyk.userinfoapi.model;
 
+import link.tomasztomczyk.userinfoapi.persistence.LoginRequestsCounter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
+@ExtendWith(MockitoExtension.class)
 class UserDataFactoryTest {
     private static final Long ID = 0xC0FFEE_C00L;
     private static final String LOGIN = "fdsklhuetwenfiojf9309";
@@ -17,9 +22,12 @@ class UserDataFactoryTest {
 
     private UserDataFactory factory;
 
+    @Mock
+    LoginRequestsCounter counter;
+
     @BeforeEach
     public void setUp() {
-        factory = new UserDataFactory();
+        factory = new UserDataFactory(counter);
         inputBuilder = InputUserData.builder()
                 .id(ID)
                 .login(LOGIN)

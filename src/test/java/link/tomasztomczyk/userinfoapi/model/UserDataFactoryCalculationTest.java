@@ -1,23 +1,32 @@
 package link.tomasztomczyk.userinfoapi.model;
 
+import link.tomasztomczyk.userinfoapi.persistence.LoginRequestsCounter;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(MockitoExtension.class)
 public class UserDataFactoryCalculationTest {
-    UserDataFactory factoryUnderTest = new UserDataFactory();
-    InputUserData.InputUserDataBuilder inputBuilder;
-    BigDecimal delta = new BigDecimal("0.00001");
+    private static final BigDecimal DELTA = new BigDecimal("0.00001");
+    @Mock
+    private LoginRequestsCounter counter;
+    private InputUserData.InputUserDataBuilder inputBuilder;
+
+    private UserDataFactory factoryUnderTest;
 
     @BeforeEach
     public void setUp(){
+        factoryUnderTest = new UserDataFactory(counter);
         inputBuilder = InputUserData.builder()
                 .login("dummy")
                 .id(12345L);
@@ -28,10 +37,6 @@ public class UserDataFactoryCalculationTest {
      * UserDataFactory provides result of calculations
      * which fulfill the following formula:
      * 6 / followers * (2 + repos)
-     * @param followers
-     * @param repos
-     * @param expected
-     * @throws UserDataFactory.UserDataInvalidException
      */
     @ParameterizedTest
     @MethodSource("provideCalculationsToCheck")
@@ -42,7 +47,7 @@ public class UserDataFactoryCalculationTest {
                 .build();
         OutputUserData output = factoryUnderTest.create(input);
         BigDecimal result = new BigDecimal(output.getCalculations());
-        assertThat(result).isCloseTo(expected, Offset.offset(delta));
+        assertThat(result).isCloseTo(expected, Offset.offset(DELTA));
     }
 
     public static Stream<Arguments> provideCalculationsToCheck() {
