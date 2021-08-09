@@ -12,6 +12,8 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.web.server.LocalServerPort;
+
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
@@ -25,8 +27,9 @@ import static org.mockito.BDDMockito.then;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ExtendWith(MockitoExtension.class)
-class UserDataProxyApplicationTests {
-    private static final String GIVEN_USR_NAME = "user12345";
+class UserApiTest{
+    private GithubUserDTO givenRespBody;
+    private static final String GIVEN_USER_NAME = "user12345";
     private static final int id = 0xC00FEE;
     private static final String login = "DUMMY LOGIN";
 
@@ -46,40 +49,61 @@ class UserDataProxyApplicationTests {
         testInvocation = ClientBuilder.newClient()
                 .target("http://localhost:" + port)
                 .path("users")
-                .path(GIVEN_USR_NAME)
+                .path(GIVEN_USER_NAME)
                 .request();
 
         given(targetMock.request(any(String.class))).willReturn(invocationMock);
+        given(targetMock.request()).willReturn(invocationMock);
         given(targetMock.path(any(String.class))).willReturn(targetMock);
         given(invocationMock.get()).willReturn(responseMock);
         given(responseMock.getStatus()).willReturn(200);
-    }
 
-    @Test
-    void proxyUsesGivenUserNameAsAResourcePath() {
-        testInvocation.get();
-        then(targetMock).should().path(GIVEN_USR_NAME);
-    }
-
-    @Test
-    void proxyReturnsResponseFromTheDownstreamService() throws JSONException {
-        var givenRespBody = new SourceUserData();
+        givenRespBody = new GithubUserDTO();
         givenRespBody.setId(id);
         givenRespBody.setLogin(login);
-        var expectedResult = new JSONObject();
-        expectedResult.put("id", id);
-        expectedResult.put("login", login);
-
-        given(responseMock.readEntity(SourceUserData.class)).willReturn(givenRespBody);
-        var resp = testInvocation.get();
-        var result = resp.readEntity(String.class);
-        JSONAssert.assertEquals(expectedResult.toString(), result, JSONCompareMode.LENIENT);
-        assertEquals(200, resp.getStatus());
     }
 
     @Test
-    void proxyUsesGivenUserNameAsAResourcdsfePath() {
-        given(responseMock.getHeaders()).willReturn(new MultivaluedHashMap<>());
+    void apiUsesGivenUserNameAsAResourcePath() {
+        given(responseMock.readEntity(GithubUserDTO.class)).willReturn(givenRespBody);
+        testInvocation.get();
+        then(targetMock).should().path(GIVEN_USER_NAME);
+    }
+
+    @Test
+    void apiReturnsResponseFromTheDownstreamService() throws JSONException {
+        given(responseMock.readEntity(GithubUserDTO.class)).willReturn(givenRespBody);
+        var resp = testInvocation.get();
+        var result = resp.readEntity(String.class);
+
+        assertEquals(200, resp.getStatus());
+
+        var expectedResult = new JSONObject();
+        expectedResult.put("id", Long.toString(id));
+        expectedResult.put("login", login);
+        JSONAssert.assertEquals(expectedResult.toString(), result, JSONCompareMode.LENIENT);
+    }
+
+    @Test
+    void apiReturnsBadGatewayIfTheDownstreamServiceReturnsNonParsableResponse() {
+        given(responseMock.getStatus()).willReturn(200);
+        given(responseMock.readEntity(GithubUserDTO.class)).willThrow(new ProcessingException(""));
+
+        var resp = testInvocation.get();
+        assertEquals(502, resp.getStatus());
+    }
+
+    @Test
+    void apiReturnsBadGatewayIfTheDownstreamServiceReturnsResponseWithNoLogin() {
+        given(responseMock.getStatus()).willReturn(200);
+        given(responseMock.readEntity(GithubUserDTO.class)).willReturn(new GithubUserDTO());
+
+        var resp = testInvocation.get();
+        assertEquals(502, resp.getStatus());
+    }
+
+    @Test
+    void apiReturnsBadGatewayIfTheDownstreamServiceReturnsError() {
         given(responseMock.getStatus()).willReturn(500);
 
         var resp = testInvocation.get();
@@ -87,7 +111,7 @@ class UserDataProxyApplicationTests {
     }
 
     @Test
-    void proxyUsesGivenUserNameAsAResourcdsfePatfsdfsh() {
+    void apiReturnsUserErrorsToTheApiUser() {
         given(responseMock.getHeaders()).willReturn(new MultivaluedHashMap<>());
         given(responseMock.getStatus()).willReturn(403);
         var resp = testInvocation.get();

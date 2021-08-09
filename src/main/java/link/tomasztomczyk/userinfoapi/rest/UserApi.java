@@ -1,6 +1,8 @@
 package link.tomasztomczyk.userinfoapi.rest;
 
-import link.tomasztomczyk.userinfoapi.config.TargetApiConfig;
+import link.tomasztomczyk.userinfoapi.model.InputUserData;
+import link.tomasztomczyk.userinfoapi.model.OutputUserData;
+import link.tomasztomczyk.userinfoapi.model.UserDataFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +24,12 @@ public class UserApi {
     private static final int OK = Response.Status.OK.getStatusCode();
     private final Logger logger = LoggerFactory.getLogger(UserApi.class);
     private final WebTarget target;
+    private final UserDataFactory dataFactory;
 
     @Autowired
-    public UserApi(WebTarget target) {
+    public UserApi(WebTarget target, UserDataFactory dataFactory) {
         this.target = target;
+        this.dataFactory = dataFactory;
     }
 
     @GET
@@ -35,15 +39,15 @@ public class UserApi {
         final var resp = getResponse(login);
         final int status = resp.getStatus();
         final Response result;
-
         if (OK == status) {
-            result = readResponse(resp);
+            var incommingData = readResponse(resp);
+            var outgoingData = translateData(incommingData);
+            result = Response.ok(outgoingData).build();
         } else if (CLIENT_ERROR == familyOf(status)) {
             result = Response.fromResponse(resp).build();
         } else {
-            result = Response.fromResponse(resp).status(Response.Status.BAD_GATEWAY).build();
+            throw new BadGatewayException("Downstream proxy unexpected error");
         }
-
         return result;
     }
 
@@ -53,17 +57,26 @@ public class UserApi {
                 .get();
     }
 
-    private Response readResponse(Response resp) {
-        final Response result;
-        SourceUserData gud = null;
-
+    private InputUserData readResponse(Response resp) {
         try {
-            gud = resp.readEntity(SourceUserData.class);
+            return resp.readEntity(GithubUserDTO.class)
+                    .getData();
         } catch (ProcessingException ex) {
-            ex.printStackTrace();
+            throw new BadGatewayException(ex.getMessage());
         }
+    }
 
-        result = Response.ok(gud).build();
-        return result;
+    private OutputUserData translateData(InputUserData input) {
+        try {
+            return dataFactory.create(input);
+        } catch (UserDataFactory.UserDataInvalidException ex) {
+            throw new BadGatewayException(ex.getMessage());
+        }
+    }
+
+    public static final class BadGatewayException extends RuntimeException{
+        public BadGatewayException(String msg) {
+            super(msg);
+        }
     }
 }
